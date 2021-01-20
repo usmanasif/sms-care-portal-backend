@@ -1,17 +1,4 @@
-# CoachMe Health Automated SMS Dashboard
-
-Automated SMS dashboard with chatbot for automatically monitoring and tabulating patient data. Built Fall 2020 under Hack4Impact Penn.
-
-**Project Manager/Technical Lead:** Ben Demers, Carol Li
-
-**Team Members:**
-* Cindy Jiang
-* Jared Asch
-* Subin Lee
-* Alex Xu
-* Gautam Narayan
-* Grace Fujinaga
-* Matthew Dong
+# CoachMe Health SMS Care Delivery Tool
 
 ## Setting Up
 
@@ -63,3 +50,8 @@ $ yarn client
 #### To Deploy
 
 Deploying this project on Heroku is dead simple. Basically, go on Heroku and create a new Heroku app, connect your project Github to your new Heroku app, and hit Deploy. Note, that you will need to configure the enviromental variable under settings.
+
+
+## Acknowledgements & Thank You's
+
+* The first version of this tool was built by a volunteer team as part of UPenn Hack4Impact. You can find their work [here](https://github.com/hack4impact-upenn/coach-me-health)
