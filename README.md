@@ -2,54 +2,27 @@
 
 ## Setting Up
 
-#### Recommended Tools Checklist
+#### Tool Dependencies
 
 - Git Clone this repository
-- Create a [MongoDB Atlas Account](https://www.mongodb.com/cloud/atlas)
-- Create a [Heroku account](https://www.heroku.com/)
-- Install [Node.JS](https://nodejs.org/en/download/)
-- Install [Yarn Package Manager](https://classic.yarnpkg.com/en/docs/install/#mac-stable)
+- Have MongoDB running locally (we recommend homebrew) or through Docker
+- Install relevant NodeJS version as documented in Dockerfile and/or .tool-versions. 
+  - We recommend you use [ASDF](https://github.com/asdf-vm/asdf) as a language version manager. 
+- Install Yarn Package Manager
 
-#### Installing Requirements
+#### Editor Setup
 
-```bash
-$ git clone https://github.com/Orang-utan/ts-boilerplate.git
-$ cd ts-boilerplate
-$ yarn setup
-```
+This project uses Typescript, ESLint and Prettier. You should ensure you have your editor, or git hooks setup to run these tools automatically. PRs will not be merged if there are compiler, or lint errors. 
 
-##### Configuring Enviromental Variable
+We recommend using VSCode as it has very good Typescript support. 
 
-Create file called ".env.development" in root directory, it should look like the following:
 
-```
-ATLAS_URI=mongodb-connection-string-placeholder
-JWT_SECRET=my-secret-jwt-key-placeholder
-TWILIO_ACCOUNT_SID = twilio-account-sid-placeholder
-TWILIO_AUTH_TOKEN = twilio-auth-token-placeholder
-TWILIO_PHONE_NUMBER = twilio-number-placeholder
-```
+#### Running the Project
 
-Then, create another file called ".env" in "src/client", it should look like the following:
-
-```
-REACT_APP_API_URL="http://localhost:5000"
-```
-
-#### Running Project
-
-```bash
-$ # run both server and client
-$ yarn dev
-$ # run server only
-$ yarn server
-$ # run client only
-$ yarn client
-```
-
-#### To Deploy
-
-Deploying this project on Heroku is dead simple. Basically, go on Heroku and create a new Heroku app, connect your project Github to your new Heroku app, and hit Deploy. Note, that you will need to configure the enviromental variable under settings.
+1. Make sure you have all tool dependencies installed and running
+1. Install project dependencies using `yarn install`
+1. Setup your local ENV variables using your prefered shell environment management tool (we like [direnv](https://github.com/direnv/direnv)
+1. Run the tests, local server, or typescript compiler using the relevant yarn command. 
 
 
 ## Acknowledgements & Thank You's
