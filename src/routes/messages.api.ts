@@ -17,7 +17,7 @@ const router = express.Router();
 initializeScheduler();
 
 // run messages every day at midnight PST
-cron.schedule('0 0 0 * * *', () => {
+cron.schedule('0 */5 * * * *', () => {
   console.log('Running batch of schdueled messages');
   Patient.find().then((patients) => {
     MessageTemplate.find({type: 'Initial'}).then((MessageTemplates) => {
