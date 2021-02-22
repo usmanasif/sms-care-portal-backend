@@ -24,6 +24,10 @@ cron.schedule('0 */5 * * * *', () => {
       patients.forEach((patient) => {
         if (patient.enabled) {
           const messages = MessageTemplates.filter(template => template.language === patient.language);
+          if (messages.length < 1) {
+            console.log('Unable to find message appropriate for member = ', patient._id);
+            return;
+          }
           const randomVal =  Math.floor(Math.random() * (messages.length));
           const message = messages[randomVal].text;
           const date = new Date();
