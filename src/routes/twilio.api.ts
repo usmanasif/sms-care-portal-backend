@@ -10,7 +10,7 @@ import {
 
 import { Message } from '../models/message.model';
 import { MessageTemplate } from '../models/messageTemplate.model';
-import {TWILIO_ACCOUNT_SID, TWILIO_AUTHTOKEN, TWILIO_NUMBER} from '../utils/config';
+import {TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER} from '../utils/config';
 
 import { Outcome } from '../models/outcome.model';
 import { Patient } from '../models/patient.model';
@@ -19,15 +19,7 @@ import auth from '../middleware/auth';
 
 const {MessagingResponse} = require('twilio').twiml;
 
-let twilioNumber: string;
-if (TWILIO_NUMBER) {
-  twilioNumber = TWILIO_NUMBER.replace(/[^0-9.]/g, '');
-} else {
-  twilioNumber = 'MISSING';
-  console.log('No phone number found in env vars!');
-}
-
-const twilio = require('twilio')(TWILIO_ACCOUNT_SID, TWILIO_AUTHTOKEN);
+const twilio = require('twilio')(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 const bodyParser = require('body-parser');
 
 const router = express.Router();
@@ -73,7 +65,7 @@ function initializeState() {
 
 initializeState();
 
-router.post('/sendMessage', auth, function (req, res) {
+router.post('/sendMessage', auth, (req, res) => {
   const contnet = req.body.message;
   const recept = req.body.to;
   const patientID = new ObjectId(req.body.patientID);
@@ -82,13 +74,13 @@ router.post('/sendMessage', auth, function (req, res) {
   twilio.messages
     .create({
       body: contnet,
-      from: twilioNumber, // this is hardcoded right now
+      from: TWILIO_FROM_NUMBER,
       to: recept
     });
 
   const outgoingMessage = new Message({
     sent: true,
-    phoneNumber: twilioNumber,
+    phoneNumber: TWILIO_FROM_NUMBER,
     patientID,
     message: contnet,
     sender: 'COACH',
@@ -105,7 +97,7 @@ router.post('/sendMessage', auth, function (req, res) {
 
 
 // this route receives and parses the message from one user, then responds accordingly with the appropriate output
-router.post('/reply', function (req, res) {
+router.post('/reply', (req, res) => {
   const twiml = new MessagingResponse();
   const message = twiml.message();
   let response = req.body.Body;

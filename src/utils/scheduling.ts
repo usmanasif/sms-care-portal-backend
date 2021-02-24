@@ -1,18 +1,10 @@
 import schedule from 'node-schedule';
 import { ObjectId } from 'mongodb';
 import { Message, IMessage } from '../models/message.model';
-import {TWILIO_ACCOUNT_SID, TWILIO_AUTHTOKEN, TWILIO_NUMBER} from './config';
+import {TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER} from './config';
 import { Patient } from '../models/patient.model';
 
-const twilio = require('twilio')(TWILIO_ACCOUNT_SID, TWILIO_AUTHTOKEN);
-
-let twilioNumber: string;
-if (TWILIO_NUMBER) {
-  twilioNumber = TWILIO_NUMBER.replace(/[^0-9.]/g, '');
-} else {
-  twilioNumber = 'MISSING';
-  console.log('No phone number found in env vars!');
-}
+const twilio = require('twilio')(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 
 
 // time in seconds between each run of scheduler
@@ -34,7 +26,7 @@ const sendMessage = (msg : IMessage) => {
   twilio.messages
     .create({
       body: msg.message,
-      from: twilioNumber,
+      from: TWILIO_FROM_NUMBER,
       to: msg.phoneNumber
     });
 
