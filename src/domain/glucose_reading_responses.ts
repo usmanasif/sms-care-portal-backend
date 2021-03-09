@@ -1,3 +1,4 @@
+import { capitalize, sample } from 'lodash';
 import { MessageTemplate } from '../models/messageTemplate.model';
 import { ParsedMessage } from './message_parsing';
 
@@ -87,16 +88,15 @@ export const responseForParsedMessage = async (
   }
 
   const templates = await MessageTemplate.find({
-    language: lang,
+    language: capitalize(lang),
     type: classification,
   });
 
-  if (templates.length < 1) {
+  const randomTemplate = sample(templates);
+
+  if (!randomTemplate) {
     return DefaultResponses[classification][lang];
   }
-
-  const randomTemplate =
-    templates[Math.floor(Math.random() * templates.length)];
 
   return randomTemplate.text;
 };
