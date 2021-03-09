@@ -89,8 +89,10 @@ export const responseForParsedMessage = async (
 
   const templates = await MessageTemplate.find({
     language: capitalize(lang),
-    type: classification,
+    type: capitalize(classification),
   });
+
+  console.log('Got message templates from DB = ', templates);
 
   const randomTemplate = sample(templates);
 
