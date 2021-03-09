@@ -6,7 +6,7 @@ type SupportedLanguage = 'english' | 'spanish';
 export const DefaultResponses = {
   catchall: {
     english:
-      'Hi, I don’t recognize this. Please send a number in your message for us to track your sugar. Thanks!',
+      'Hi, this is the automated blood glucose tracker. Please send a number in your message for us to track your sugar. If you wish to reach your coach text them at (650) 534-0331. Thanks!',
     spanish:
       'Hola, este es el monitoreo automatizado de glucosa. Favor envianos tu nivel de azucar en el mensaje, para agregarlo a tus datos. Si quieres hablar con tu consejero de salud, enviale un texto al (650) 534-0331. Gracias!',
   },
