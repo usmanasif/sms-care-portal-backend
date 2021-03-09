@@ -73,7 +73,7 @@ const responseLanguage = (language?: string): SupportedLanguage => {
 
 export const responseForParsedMessage = async (
   parsedMessage: ParsedMessage,
-  language?: SupportedLanguage,
+  language?: string,
 ): Promise<string> => {
   const lang = responseLanguage(language);
 

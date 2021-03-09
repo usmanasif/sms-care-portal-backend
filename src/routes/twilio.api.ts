@@ -102,7 +102,10 @@ router.post('/reply', async (req, res) => {
     await outcome.save();
   }
 
-  const responseMessage = await responseForParsedMessage(parsedResponse);
+  const responseMessage = await responseForParsedMessage(
+    parsedResponse,
+    patient.language,
+  );
 
   const outgoingMessage = new Message({
     sent: true,
