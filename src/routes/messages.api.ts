@@ -17,7 +17,7 @@ initializeScheduler();
 
 // run messages every day at midnight PST
 cron.schedule(
-  '0 0 9 * * *',
+  '0 0 5 * * *',
   () => {
     console.log('Running batch of schdueled messages');
     Patient.find().then((patients) => {
