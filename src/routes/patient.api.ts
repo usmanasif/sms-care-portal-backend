@@ -97,21 +97,6 @@ router.post('/add', auth, async (req, res) => {
   });
 });
 
-// maybe make this not accessible or something not sure how
-router.get('/getPatient/:id', auth, (req, res) => {
-  Patient.findOne({
-    _id: req.params.id,
-  })
-    .then((patient) => {
-      res.status(200).json(patient);
-    })
-    .catch(() => {
-      res.status(404).json({
-        msg: 'Unable to increase response count: patient ID not found',
-      });
-    });
-});
-
 router.put('/increaseResponseCount/:id', auth, (req, res) => {
   if (
     !req.body.phoneNumber ||
