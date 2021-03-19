@@ -49,4 +49,8 @@ const PatientForPhoneNumber = async (
   return Patient.findOne({ phoneNumber });
 };
 
-export { Patient, PatientForPhoneNumber, IPatient };
+async function checkPatientExist(customerId: string) {
+  return Patient.exists({_id: customerId})
+}
+
+export { Patient, PatientForPhoneNumber, IPatient, checkPatientExist };

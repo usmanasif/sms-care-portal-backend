@@ -10,6 +10,7 @@ import messageRouter from './routes/messages.api';
 import coachRouter from './routes/coach.auth';
 import twilioRouter from './routes/twilio.api';
 import messageTemplateRouter from './routes/messageTemplate.api';
+import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
@@ -28,6 +29,8 @@ app.use('/api/coaches', coachRouter);
 app.use('/api/messages', messageRouter);
 app.use('/api/twilio', twilioRouter);
 app.use('/api/messageTemplate', messageTemplateRouter);
+
+app.use(errorHandler);
 
 const server = app.listen(app.get('port'), () => {
   console.log(`Listening on port ${app.get('port')} 🚀`);

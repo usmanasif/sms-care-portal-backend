@@ -1,81 +1,40 @@
 /* eslint-disable @typescript-eslint/indent */
-import express from 'express';
+import express, {Request, Response} from 'express';
 import { Outcome } from '../models/outcome.model';
-import { Patient, PatientForPhoneNumber } from '../models/patient.model';
+import { Patient, PatientForPhoneNumber, checkPatientExist } from '../models/patient.model';
 import auth from '../middleware/auth';
-import errorHandler from './error';
 import { Message } from '../models/message.model';
+import { ValidationError, ResourceNotFoundError } from '../exceptions';
+import { validatePhoneNumber, validateLanguage, validateMessageTime, validateMongoId } from '../validators';
+import wrapAsync from '../utils/asyncWrapper';
 
 const { ObjectId } = require('mongoose').Types;
 
 const router = express.Router();
 
-router.post('/add', auth, async (req, res) => {
-  // validate phone number
-  if (
-    !req.body.phoneNumber ||
-    req.body.phoneNumber.match(/\d/g) == null ||
-    req.body.phoneNumber.match(/\d/g).length !== 10
-  ) {
-    return res.status(400).json({
-      msg: 'Unable to add patient: invalid phone number',
-    });
-  }
+router.post('/add', auth, wrapAsync(async (req, res) => {
+  
+  validatePhoneNumber(req.body.phoneNumber)
 
   if (await PatientForPhoneNumber(req.body.phoneNumber)) {
-    return res.status(400).json({
-      msg:
-        'Unable to add patient: patient already exists for given phone number',
-    });
+    throw new ValidationError('Patient already exists for given phone number');
   }
 
   if (req.body.firstName === '') {
-    return res.status(400).json({
-      msg: 'Unable to add patient: must include first name',
-    });
+    throw new ValidationError('Invalid first name');
   }
 
   if (req.body.lastName === '') {
-    return res.status(400).json({
-      msg: 'Unable to add patient: must include last name',
-    });
+    throw new ValidationError('Invalid last name');
   }
 
-  if (req.body.language === '') {
-    return res.status(400).json({
-      msg: 'Unable to add patient: must include language',
-    });
-  }
+  validateLanguage(req.body.language);
 
   if (!req.body.coachId || req.body.coachId === '') {
-    return res.status(400).json({
-      msg: 'Unable to add patient: select a coach from the dropdown',
-    });
+    throw new ValidationError('Invalid coachId');
   }
 
-  // Time parsing
-  const splitTime = req.body.msgTime.split(':');
-  if (splitTime.length !== 2) {
-    return res.status(400).json({
-      msg: 'Unable to add patient: invalid message time',
-    });
-  }
-
-  const hours = Number(splitTime[0]);
-  const mins = Number(splitTime[1]);
-
-  if (
-    Number.isNaN(hours) ||
-    Number.isNaN(mins) ||
-    hours < 0 ||
-    hours >= 24 ||
-    mins >= 60 ||
-    mins < 0
-  ) {
-    return res.status(400).json({
-      msg: 'Unable to add patient: invalid message time',
-    });
-  }
+  const {hours, mins} = validateMessageTime(req.body.msgTime);
 
   const newPatient = new Patient({
     firstName: req.body.firstName,
@@ -90,41 +49,32 @@ router.post('/add', auth, async (req, res) => {
     enabled: req.body.isEnabled,
     prefTime: hours * 60 + mins,
   });
-  return newPatient.save().then(() => {
-    res.status(200).json({
-      success: true,
-    });
-  });
-});
 
-router.put('/increaseResponseCount/:id', auth, (req, res) => {
-  if (
-    !req.body.phoneNumber ||
-    req.body.phoneNumber.match(/\d/g) == null ||
-    req.body.phoneNumber.match(/\d/g).length !== 10
-  ) {
-    return res.status(400).json({
-      msg: 'Unable to add patient: invalid phone number',
-    });
-  }
+  await newPatient.save();
+
+  res.status(200).json({
+    success: true
+  })
+}));
+
+router.put('/increaseResponseCount/:id', auth, wrapAsync(async (req, res) => {
+
+  validatePhoneNumber(req.body.phoneNumber);
 
   if (req.body.firstName === '') {
-    return res.status(400).json({
-      msg: 'Unable to add patient: must include first name',
-    });
+    throw new ValidationError('Invalid first name');
   }
 
   if (req.body.lastName === '') {
-    return res.status(400).json({
-      msg: 'Unable to add patient: must include last name',
-    });
+    throw new ValidationError('Invalid last name');
   }
 
-  if (req.body.language === '') {
-    return res.status(400).json({
-      msg: 'Unable to add patient: must include language',
-    });
+  validateLanguage(req.body.language);
+
+  if(!checkPatientExist(req.params.id)) {
+    throw new ValidationError('Invalid patient id');
   }
+
   const patient = new Patient({
     firstName: req.body.firstName,
     lastName: req.body.lastName,
@@ -134,57 +84,67 @@ router.put('/increaseResponseCount/:id', auth, (req, res) => {
     responseCount: req.body.responseCount,
     messagesSent: req.body.messagesSent,
   });
-  return Patient.updateOne({ _id: req.params.id }, patient).then(() => {
-    return res.status(201).json({
-      msg: 'Patient response count updated successfully!',
-      sucess: true,
-    });
+
+  await Patient.updateOne({ _id: req.params.id }, patient);
+
+  res.status(200).json({
+    msg: 'Patient response count updated successfully!',
+    sucess: true,
   });
-});
+}));
 
-router.get('/getPatientOutcomes/:patientID', auth, (req, res) => {
+router.get('/getPatientOutcomes/:patientID', auth, wrapAsync(async (req, res) => {
+
   const id = req.params.patientID;
-  return Outcome.find({ patientID: new ObjectId(id) })
-    .then((outcomeList) => {
-      if (!outcomeList)
-        return errorHandler(res, 'No outcomes found!');
 
-      return res
-        .status(200)
-        .json(outcomeList.sort((a: any, b: any) => b.date - a.date));
-    })
-    .catch((err) => errorHandler(res, err.message));
-});
+  if(!checkPatientExist(id)) {
+    throw new ValidationError('Invalid patient id');
+  }
 
-router.get('/getPatient/:patientID', auth, (req, res) => {
+  const outcomeList = await Outcome.find({ patientID: new ObjectId(id) }).sort({date: 1});
+
+  res.status(200).json(outcomeList);
+
+}));
+
+router.get('/getPatient/:patientID', auth, wrapAsync(async (req, res) => {
   const id = req.params.patientID;
-  return Patient.findById(new ObjectId(id))
-    .then((patient) => {
-      if (!patient) return errorHandler(res, 'No patient found!');
-      return res.status(200).json(patient);
-    })
-    .catch((err) => errorHandler(res, err.message));
-});
 
-router.get('/getPatientMessages/:patientID', auth, (req, res) => {
+  if (!validateMongoId(id)) {
+    throw new ResourceNotFoundError('Patient with given id not found');
+  }
+
+  const patient = await Patient.findById(new ObjectId(id));
+
+  if (!patient) {
+    throw new ResourceNotFoundError('Patient with given id not found');
+  }
+
+  res.status(200).json(patient);
+}));
+
+router.get('/getPatientMessages/:patientID', auth, wrapAsync(async (req, res) => {
   const id = req.params.patientID;
-  return Message.find({ patientID: new ObjectId(id) })
-    .then((outcomeList) => {
-      if (!outcomeList)
-        return errorHandler(res, 'No outcomes found!');
-      return res.status(200).json(outcomeList);
-    })
-    .catch((err) => errorHandler(res, err.message));
-});
 
-router.post('/status', auth, (req, res) => {
-  const { id } = req.body;
-  const { status } = req.body;
-  return Patient.findByIdAndUpdate(new ObjectId(id), { enabled: status })
-    .then(() => {
-      return res.status(200).json('Patiet Status Changed!');
-    })
-    .catch((err) => errorHandler(res, err.message));
-});
+  if(!checkPatientExist(id)) {
+    throw new ValidationError('Invalid patient id');
+  }
+
+  const messageList = await Message.find({ patientID: new ObjectId(id) });
+
+  res.status(200).json(messageList);
+}));
+
+router.post('/status', auth, wrapAsync(async (req, res) => {
+  const { id, status } = req.body;
+
+  if(!checkPatientExist(id)) {
+    throw new ValidationError('Invalid patient id');
+  }
+
+  await Patient.findByIdAndUpdate(new ObjectId(id), { enabled: status });
+
+  res.status(200).json('Patiet Status Changed!');
+}));
 
 export default router;
