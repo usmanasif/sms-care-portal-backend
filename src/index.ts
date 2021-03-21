@@ -10,7 +10,7 @@ import messageRouter from './routes/messages.api';
 import coachRouter from './routes/coach.auth';
 import twilioRouter from './routes/twilio.api';
 import messageTemplateRouter from './routes/messageTemplate.api';
-import { errorHandler } from './middleware/errorHandler';
+import errorHandler from './middleware/errorHandler';
 
 const app = express();
 

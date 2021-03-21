@@ -6,25 +6,25 @@ const ENGLISH_LANG = 'english';
 const SPANISH_LANG = 'spanish'; 
 
 export function validatePhoneNumber(phoneNumber: string) {
-    if(phoneNumber && PHONE_NUMBER_REGEX.test(phoneNumber)) {
-        return;
-    }
-    throw new ValidationError('Invalid phone number')
+  if (phoneNumber && PHONE_NUMBER_REGEX.test(phoneNumber)) {
+    return;
+  }
+  throw new ValidationError('Invalid phone number');
 }
 
 export function validateLanguage(language: string) {
-    if (language && (language.toLowerCase() === ENGLISH_LANG || language.toLowerCase() === SPANISH_LANG)) {
-        return;
-    }
-    throw new ValidationError('Invalid language');
+  if (language && (language.toLowerCase() === ENGLISH_LANG || language.toLowerCase() === SPANISH_LANG)) {
+    return;
+  }
+  throw new ValidationError('Invalid language');
 }
 
 export function validateMessageTime(messageTime: string) {
-    // Time parsing
-    const splitTime = messageTime.split(':');
-    if (splitTime.length !== 2) {
-        throw new ValidationError('Invalid message time');
-    }
+  // Time parsing
+  const splitTime = messageTime.split(':');
+  if (splitTime.length !== 2) {
+    throw new ValidationError('Invalid message time');
+  }
 
   const hours = Number(splitTime[0]);
   const mins = Number(splitTime[1]);
@@ -44,7 +44,7 @@ export function validateMessageTime(messageTime: string) {
 }
 
 export function validateMongoId(id: string): boolean {
-    return Types.ObjectId.isValid(id);
+  return Types.ObjectId.isValid(id);
 }
 
 

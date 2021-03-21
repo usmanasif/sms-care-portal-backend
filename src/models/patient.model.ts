@@ -50,7 +50,7 @@ const PatientForPhoneNumber = async (
 };
 
 async function checkPatientExist(customerId: string) {
-  return Patient.exists({_id: customerId})
+  return Patient.exists({_id: customerId});
 }
 
 export { Patient, PatientForPhoneNumber, IPatient, checkPatientExist };

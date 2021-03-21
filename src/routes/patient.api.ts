@@ -15,9 +15,9 @@ const router = express.Router();
 
 router.post('/add', auth, wrapAsync(async (req, res) => {
 
-  const { firstName, lastName, phoneNumber,language, coachId, msgTime, isEnabled } = req.body;
+  const { firstName, lastName, phoneNumber, language, coachId, msgTime, isEnabled } = req.body;
   
-  validatePhoneNumber(phoneNumber)
+  validatePhoneNumber(phoneNumber);
 
   if (await PatientForPhoneNumber(phoneNumber)) {
     throw new ValidationError('Patient already exists for given phone number');
@@ -43,7 +43,7 @@ router.post('/add', auth, wrapAsync(async (req, res) => {
     throw new ValidationError('Invalid coachId');
   }
 
-  const coachName = coach.firstName + ' ' + coach.lastName;
+  const coachName = `${coach.firstName  } ${  coach.lastName}`;
 
   if (isEnabled === undefined || typeof isEnabled !== 'boolean') {
     throw new ValidationError('Invalid isEnabled field');
@@ -52,15 +52,15 @@ router.post('/add', auth, wrapAsync(async (req, res) => {
   const {hours, mins} = validateMessageTime(msgTime);
 
   const newPatient = new Patient({
-    firstName: firstName,
-    lastName: lastName,
-    language: language,
-    phoneNumber: phoneNumber,
+    firstName,
+    lastName,
+    language,
+    phoneNumber,
     reports: [],
     responseCount: 0,
     messagesSent: 0,
     coachID: coachId,
-    coachName: coachName,
+    coachName,
     enabled: isEnabled,
     prefTime: hours * 60 + mins,
   });
@@ -69,16 +69,16 @@ router.post('/add', auth, wrapAsync(async (req, res) => {
 
   res.status(200).json({
     success: true
-  })
+  });
 }));
 
 
 router.put('/increaseResponseCount/:patientID', auth, wrapAsync(async (req, res) => {
 
   const id = req.params.patientID;
-  const responseCount = req.body.responseCount;
+  const {responseCount} = req.body;
 
-  if(!validateMongoId(id) || !checkPatientExist(id)) {
+  if (!validateMongoId(id) || !checkPatientExist(id)) {
     throw new ValidationError('Invalid patient id');
   }
 
@@ -94,7 +94,7 @@ router.get('/getPatientOutcomes/:patientID', auth, wrapAsync(async (req, res) =>
 
   const id = req.params.patientID;
 
-  if(!validateMongoId(id) || !checkPatientExist(id)) {
+  if (!validateMongoId(id) || !checkPatientExist(id)) {
     throw new ValidationError('Invalid patient id');
   }
 
@@ -123,7 +123,7 @@ router.get('/getPatient/:patientID', auth, wrapAsync(async (req, res) => {
 router.get('/getPatientMessages/:patientID', auth, wrapAsync(async (req, res) => {
   const id = req.params.patientID;
 
-  if(!validateMongoId(id) || !checkPatientExist(id)) {
+  if (!validateMongoId(id) || !checkPatientExist(id)) {
     throw new ValidationError('Invalid patient id');
   }
 
@@ -135,15 +135,15 @@ router.get('/getPatientMessages/:patientID', auth, wrapAsync(async (req, res) =>
 router.post('/status', auth, wrapAsync(async (req, res) => {
   const { id, status } = req.body;
 
-  if(!validateMongoId(id) || !checkPatientExist(id)) {
+  if (!validateMongoId(id) || !checkPatientExist(id)) {
     throw new ValidationError('Invalid patient id');
   }
 
   await Patient.findByIdAndUpdate(new ObjectId(id), { enabled: status });
 
   res.status(200).json({
-    succes: "true",
-    message: "Patient status updated."
+    succes: 'true',
+    message: 'Patient status updated.'
   });
 }));
 

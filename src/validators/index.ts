@@ -1,2 +1,2 @@
 export * from './common';
-export * from './messageTemplate';
+export { default as validateMessageTemplateType } from './messageTemplate';

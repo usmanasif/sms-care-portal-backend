@@ -4,7 +4,7 @@ export const Error = {
   RESOURCE_NOT_FOUND: 'resourceNotFound',
   BAD_REQUEST: 'badRequest',
   INTERNAL_SERVER_ERROR: 'internalServerError'
-}
+};
 
 const errorHandler = (
   res: any,
@@ -17,7 +17,7 @@ const errorHandler = (
       message: errorMessage,
       code: errorCode,
     });
-  } else if (errorCode === Error.RESOURCE_NOT_FOUND) {
+  } if (errorCode === Error.RESOURCE_NOT_FOUND) {
     return res.status(404).send({
       success: false,
       message: errorMessage,
