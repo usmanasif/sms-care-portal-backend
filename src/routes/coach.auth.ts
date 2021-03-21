@@ -1,9 +1,9 @@
 import express from 'express';
 import { hash, compare } from 'bcrypt';
 import { ObjectId } from 'mongodb';
-import { Coach, ICoach } from '../models/coach.model';
+import * as _ from 'lodash';
+import { Coach } from '../models/coach.model';
 import auth from '../middleware/auth';
-import errorHandler from './error';
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -11,111 +11,102 @@ import {
 } from './coach.util';
 import { Patient } from '../models/patient.model';
 import { CoachMeRequest } from '../types/coach_me_request';
+import wrapAsync from '../utils/asyncWrapper';
+import { UnauthorizedError, ValidationError } from '../exceptions';
 
 const router = express.Router();
 
 const saltRounds = 10;
 
 // create new coach
-router.post('/signup', auth, async (req, res) => {
-  const { firstName } = req.body;
-  const { lastName } = req.body;
-  const emailRaw = req.body.email;
-  const emailLower = emailRaw.toLowerCase();
-  const { password } = req.body;
+router.post('/signup', auth, wrapAsync(async (req, res) => {
+  const { firstName, lastName, email, password } = req.body;
+  const emailLower = email.toLowerCase();
 
   if (await Coach.findOne({ email: emailLower })) {
-    return errorHandler(res, 'User already exists.');
+    throw new ValidationError('User already exists.');
   }
 
-  // hash + salt password
-  return hash(password, saltRounds, (err, hashedPassword) => {
-    if (err) {
-      return errorHandler(res, err.message);
-    }
-    const newCoach = new Coach({
-      firstName,
-      lastName,
-      email: emailLower,
-      password: hashedPassword,
-    });
-    return newCoach
-      .save()
-      .then(() => res.status(200).json({ success: true }))
-      .catch((e) => errorHandler(res, e.message));
+  const hashedPassword = await hash(password, saltRounds);
+
+  const newCoach = new Coach({
+    firstName,
+    lastName,
+    email: emailLower,
+    password: hashedPassword,
   });
-});
+  
+  await newCoach.save();
+
+  res.status(200).json({ success: true });
+}));
 
 // login coach
-router.post('/login', async (req, res) => {
+router.post('/login', wrapAsync(async (req, res) => {
   const emailAdress = req.body.email.toLowerCase();
   const { password } = req.body;
 
   const coach = await Coach.findOne({ email: emailAdress });
-  if (!coach) return errorHandler(res, 'Email or password is incorrect.');
-
-  if (await compare(password, coach.password)) {
-    const accessToken = generateAccessToken(coach);
-    const refreshToken = generateRefreshToken(coach);
-
-    const tokens = await Promise.all([accessToken, refreshToken]);
-    return res.status(200).json({
-      success: true,
-      accessToken: tokens[0],
-      refreshToken: tokens[1],
-    });
+  if (!coach) {
+    throw new UnauthorizedError('Email or password is incorrect.');
   }
-  // wrong password
-  return errorHandler(res, 'Email or password is incorrect.');
-});
+
+  const validCredentials = await compare(password, coach.password);
+
+  if (!validCredentials) {
+    throw new UnauthorizedError('Email or password is incorrect.');
+  }
+
+  const accessToken = await generateAccessToken(coach);
+  const refreshToken = await generateRefreshToken(coach);
+
+  return res.status(200).json({
+    success: true,
+    accessToken,
+    refreshToken,
+  });
+}));
 
 // refresh token
-router.post('/refreshToken', (req, res) => {
+router.post('/refreshToken', wrapAsync(async (req, res) => {
   const { refreshToken } = req.body;
 
   if (!refreshToken) {
-    return errorHandler(res, 'No token provided.');
+    throw new ValidationError('Missing refresh token.');
   }
 
-  return validateRefreshToken(refreshToken)
-    .then((tokenResponse: ICoach) => generateAccessToken(tokenResponse))
-    .then((accessToken: string) => {
-      res.status(200).json({
-        success: true,
-        accessToken,
-      });
-    })
-    .catch((err: { code: string; message: string }) => {
-      if (err.code) {
-        return errorHandler(res, err.message, err.code);
-      }
-      return errorHandler(res, err.message);
-    });
-});
+  const coach = await validateRefreshToken(refreshToken);
+  const accessToken = await generateAccessToken(coach);
+
+  res.status(200).json({
+    success: true,
+    accessToken,
+  });
+}));
 
 // get me
 // protected route
-router.get('/me', auth, (req: CoachMeRequest, res) => {
+router.get('/me', auth, wrapAsync(async (req: CoachMeRequest, res) => {
   const { userId } = req;
-  return Coach.findById(new ObjectId(userId))
-    .select('firstName lastName email _id')
-    .then((coach) => {
-      if (!coach) return errorHandler(res, 'User does not exist.');
 
-      return res.status(200).json({ success: true, data: coach });
-    })
-    .catch((err) => errorHandler(res, err.message));
-});
+  const coach = await Coach.findById(new ObjectId(userId));
 
-router.get('/getPatients', auth, (req, res) => {
-  return Patient.find().then((patients) => {
-    return res.status(200).json(patients);
-  });
-});
+  if (!coach) {
+    throw new ValidationError("User doesn't exist");
+  }
 
-router.get('/search', auth, async (req, res) => {
+  res.status(200).json({ success: true, data: _.omit(coach, ['password', 'refreshToken']) });
+}));
+
+router.get('/getPatients', auth, wrapAsync(async (req, res) => {
+  const patients = await Patient.find();
+  res.status(200).json(patients);
+}));
+
+router.get('/search', auth, wrapAsync(async (req, res) => {
   const { query } = req.query;
-  Coach.aggregate([
+
+  const result = Coach.aggregate([
     { $project: { name: { $concat: ['$firstName', ' ', '$lastName'] } } },
     {
       $match: {
@@ -125,11 +116,11 @@ router.get('/search', auth, async (req, res) => {
         },
       },
     },
-  ]).exec((err, result) => {
-    return res.status(200).json({
-      coaches: result,
-    });
+  ]);
+
+  res.status(200).json({
+    coaches: result,
   });
-});
+}));
 
 export default router;

@@ -2,51 +2,39 @@ import { sign, verify } from 'jsonwebtoken';
 import * as _ from 'lodash';
 import { Coach, ICoach } from '../models/coach.model';
 import { JWT_SECRET } from '../utils/config';
+import { UnauthorizedError } from '../exceptions';
 
-class AuthError extends Error {
-  code: string;
-
-  constructor(code: string, message: string) {
-    super(message);
-    this.code = code;
-  }
-}
-
-const generateAccessToken = (coach: ICoach): string =>
-  sign(_.omit(coach.toObject(), 'password'), JWT_SECRET, {
+async function generateAccessToken(coach: ICoach) {
+  return sign(_.omit(coach.toObject(), 'password'), JWT_SECRET, {
     expiresIn: '5 m', // for testing purposes
   });
+}
 
-const generateRefreshToken = (coach: ICoach): any => {
+async function generateRefreshToken(coach: ICoach) {
   const refreshToken = sign({ type: 'refresh' }, JWT_SECRET, {
     expiresIn: '9999 years',
   });
 
-  return Coach.findOneAndUpdate({ email: coach.email }, { refreshToken })
-    .then(() => refreshToken)
-    .catch((err) => {
-      throw err;
-    });
-};
+  await Coach.findOneAndUpdate({ email: coach.email }, { refreshToken });
 
-const validateRefreshToken = (refreshToken: string): Promise<any> =>
-  new Promise((res, rej) => {
-    verify(refreshToken, JWT_SECRET, (err) => {
-      if (err) {
-        rej(new AuthError('refreshExpired', 'Refresh token expired'));
-      } else {
-        Coach.findOne({ refreshToken })
-          .then((coach) => {
-            if (!coach) {
-              rej(new AuthError('invalidToken', 'Refresh token invalid'));
-            }
-            res(coach);
-          })
-          .catch((e) => {
-            rej(e);
-          });
-      }
-    });
-  });
+  return refreshToken;
+}
+
+async function validateRefreshToken(refreshToken: string) {
+
+  try {
+    verify(refreshToken, JWT_SECRET);
+  } catch (error) {
+    throw new UnauthorizedError('Expired refresh token.');
+  }
+
+  const coach = await Coach.findOne({ refreshToken });
+
+  if (!coach) {
+    throw new UnauthorizedError('Invalid refresh token.');
+  }
+
+  return coach;
+}
 
 export { generateAccessToken, generateRefreshToken, validateRefreshToken };

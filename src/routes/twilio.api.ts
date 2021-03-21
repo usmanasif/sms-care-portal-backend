@@ -1,6 +1,5 @@
 /* eslint-disable radix */
 import express from 'express';
-import { ObjectId } from 'mongodb';
 import twilio from 'twilio';
 import bodyParser from 'body-parser';
 
@@ -12,10 +11,13 @@ import {
 } from '../utils/config';
 
 import { Outcome } from '../models/outcome.model';
-import { PatientForPhoneNumber } from '../models/patient.model';
+import { checkPatientExist, PatientForPhoneNumber } from '../models/patient.model';
 import auth from '../middleware/auth';
 import { parseInboundPatientMessage } from '../domain/message_parsing';
 import { responseForParsedMessage } from '../domain/glucose_reading_responses';
+import wrapAsync from '../utils/asyncWrapper';
+import { validateMongoId } from '../validators';
+import { ValidationError } from '../exceptions';
 
 const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 const { MessagingResponse } = twilio.twiml;
@@ -26,16 +28,19 @@ router.use(bodyParser.urlencoded({ extended: true }));
 const UNRECOGNIZED_PATIENT_RESPONSE =
   'We do not recognize this number. Please contact CoachMe support.';
 
-router.post('/sendMessage', auth, (req, res) => {
-  const content = req.body.message;
-  const recept = req.body.to;
-  const patientID = new ObjectId(req.body.patientID);
+router.post('/sendMessage', auth, wrapAsync(async (req, res) => {
+  const {content, to, patientID} = req.body;
   const date = new Date();
 
+  if (!validateMongoId(patientID) || !checkPatientExist(patientID)) {
+    throw new ValidationError('Invalid patientId');
+  }
+
+  // TODO Could be great to await here so we can get message sid and save it in DB message record
   twilioClient.messages.create({
     body: content,
     from: TWILIO_FROM_NUMBER,
-    to: recept,
+    to,
   });
 
   const outgoingMessage = new Message({
@@ -47,16 +52,13 @@ router.post('/sendMessage', auth, (req, res) => {
     date,
   });
 
-  outgoingMessage
-    .save()
-    .then(() => {
-      res.status(200).send({
-        success: true,
-        msg: outgoingMessage,
-      });
-    })
-    .catch((err) => console.log(err));
-});
+  await outgoingMessage.save();
+
+  res.status(200).send({
+    success: true,
+    msg: outgoingMessage,
+  });
+}));
 
 // this route receives and parses the message from one user, then responds accordingly with the appropriate output
 router.post('/reply', async (req, res) => {
@@ -76,6 +78,7 @@ router.post('/reply', async (req, res) => {
     return;
   }
 
+  // TODO again we should save message ids from twilio
   const incomingMessage = new Message({
     sent: true,
     phoneNumber: req.body.From,
