@@ -1,34 +1,42 @@
-import * as express from 'express';
-import { verify } from 'jsonwebtoken';
+import { Response, NextFunction } from 'express';
+import { verify, VerifyErrors } from 'jsonwebtoken';
+import { UnauthorizedError } from '../exceptions';
 import { IUser } from '../models/user.model';
-import errorHandler from '../routes/error';
 import { CoachMeRequest } from '../types/coach_me_request';
+import wrapAsync from '../utils/asyncWrapper';
 import { JWT_SECRET } from '../utils/config';
 
-const auth = (
-  req: CoachMeRequest,
-  res: express.Response,
-  next: express.NextFunction,
-) => {
-  let token = req.headers.authorization;
-  if (!token)
-    return errorHandler(res, 'Your access token is invalid.', 'invalidToken');
-  token = token.replace('Bearer ', '');
+function wrapTokenVerifivationCallback(verifyFunction: (err: VerifyErrors | null, decoded: object | undefined) => Promise<any>, next: NextFunction) {
+  return function (err: VerifyErrors | null, decoded: object | undefined) {
+    verifyFunction(err, decoded).catch(next);
+  };
+}
 
-  return verify(token, JWT_SECRET, async (jwtErr, decoded) => {
+async function authMiddleware(req: CoachMeRequest, res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    throw new UnauthorizedError('Invalid access token');
+  }
+  const token = authHeader!.replace('Bearer ', '');
+
+  verify(token, JWT_SECRET, wrapTokenVerifivationCallback(async (jwtErr, decoded) => {
+
     if (jwtErr) {
-      return errorHandler(res, 'Your access token is invalid.', 'invalidToken');
+      throw new UnauthorizedError('Invalid access token');
     }
     // append decoded id onto request
     const decodedUser = decoded as IUser;
 
-    if (!decodedUser._id)
-      return errorHandler(res, 'Your access token is invalid.', 'invalidToken');
+    if (!decodedUser || !decodedUser._id) {
+      throw new UnauthorizedError('Invalid access token');
+    }
 
     req.userId = decodedUser._id;
 
-    return next();
-  });
-};
+    next();
 
-export default auth;
+  }, next));
+}
+
+export default wrapAsync(authMiddleware);

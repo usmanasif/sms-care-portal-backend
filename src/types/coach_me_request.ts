@@ -1,5 +1,9 @@
-import express from 'express';
+import {Request} from 'express';
 
-export type CoachMeRequest = express.Request & {
+export interface CoachMeRequest extends Request {
   userId?: string;
-};
+}
+
+// export type CoachMeRequest = express.Request & {
+//   userId?: string;
+// };

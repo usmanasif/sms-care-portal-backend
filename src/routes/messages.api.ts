@@ -1,14 +1,16 @@
 /* eslint-disable no-shadow */
 import express from 'express';
 import { ObjectId } from 'mongodb';
+import { ValidationError } from '../exceptions';
 import auth from '../middleware/auth';
 import { Message } from '../models/message.model';
 import { MessageTemplate } from '../models/messageTemplate.model';
 import { Outcome } from '../models/outcome.model';
-import { Patient } from '../models/patient.model';
+import { checkPatientExist, Patient } from '../models/patient.model';
+import wrapAsync from '../utils/asyncWrapper';
 
 import initializeScheduler from '../utils/scheduling';
-import errorHandler from './error';
+import { validateLanguage, validateMongoId, validatePhoneNumber } from '../validators';
 
 const cron = require('node-cron');
 
@@ -18,42 +20,41 @@ initializeScheduler();
 // run messages every day at midnight PST
 cron.schedule(
   '0 0 5 * * *',
-  () => {
-    console.log('Running batch of schdueled messages');
-    Patient.find().then((patients) => {
-      MessageTemplate.find({ type: 'Initial' })
-        .then((MessageTemplates) => {
-          patients.forEach((patient) => {
-            if (patient.enabled) {
-              const messages = MessageTemplates.filter(
-                (template) =>
-                  template.language.toLowerCase() ===
-                  patient.language.toLowerCase(),
-              );
-              if (messages.length < 1) {
-                console.log(
-                  'Unable to find message appropriate for member = ',
-                  patient._id,
-                );
-                return;
-              }
-              const randomVal = Math.floor(Math.random() * messages.length);
-              const message = messages[randomVal].text;
-              const date = new Date();
-              date.setMinutes(date.getMinutes() + 1);
-              const newMessage = new Message({
-                patientID: new ObjectId(patient._id),
-                phoneNumber: patient.phoneNumber,
-                date,
-                message,
-                sender: 'BOT',
-                sent: false,
-              });
-              newMessage.save();
-            }
-          });
-        })
-        .catch((err) => console.log(err));
+  async () => {
+    console.log('Running batch of scheduled messages');
+
+    const patients = await Patient.find();
+    const messageTemplates = await MessageTemplate.find({ type: 'Initial' });
+
+    patients.forEach((patient) => {
+      if (patient.enabled) {
+        const messages = messageTemplates.filter(
+          (template) =>
+            template.language.toLowerCase() ===
+            patient.language.toLowerCase(),
+        );
+        if (messages.length < 1) {
+          console.log(
+            'Unable to find message appropriate for member = ',
+            patient._id,
+          );
+          return;
+        }
+        const randomVal = Math.floor(Math.random() * messages.length);
+        const message = messages[randomVal].text;
+        const date = new Date();
+        date.setMinutes(date.getMinutes() + 1);
+        const newMessage = new Message({
+          patientID: new ObjectId(patient._id),
+          phoneNumber: patient.phoneNumber,
+          date,
+          message,
+          sender: 'BOT',
+          sent: false,
+        });
+
+        newMessage.save();
+      }
     });
   },
   {
@@ -62,77 +63,52 @@ cron.schedule(
   },
 );
 
-router.post('/newMessage', auth, async (req, res) => {
+router.post('/newMessage', auth, wrapAsync(async (req, res) => {
+
+  const {phoneNumber, patientID, sender, date} = req.body;
+
   // validate phone number
-  if (
-    !req.body.phoneNumber ||
-    req.body.phoneNumber.match(/\d/g) === null ||
-    req.body.phoneNumber.match(/\d/g).length !== 10
-  ) {
-    return res.status(400).json({
-      msg: 'Unable to add message: invalid phone number',
-    });
+  validatePhoneNumber(phoneNumber);
+
+  if (!patientID || !validateMongoId(patientID) || !checkPatientExist(patientID)) {
+    throw new ValidationError('Invalid patient ID');
   }
 
-  if (!req.body.patientID || req.body.patientID === '') {
-    return res.status(400).json({
-      msg: 'Unable to add message: must include patient ID',
-    });
+  if (sender) {
+    throw new ValidationError('Invalid sender');
   }
 
-  if (!req.body.sender || req.body.sender === '') {
-    return res.status(400).json({
-      msg: 'Unable to add message: must include sender',
-    });
+  // Need to add format check
+  if (!date) {
+    throw new ValidationError('Invalid date');
   }
 
-  if (!req.body.date || req.body.date === '') {
-    return res.status(400).json({
-      msg: 'Unable to add message: must include date',
-    });
+  const newMessage = new Message({
+    phoneNumber: req.body.phoneNumber,
+    patientID: req.body.patientID,
+    message: req.body.message,
+    sender: req.body.sender,
+    date: req.body.date,
+  });
+
+  await newMessage.save();
+
+  res.status(200).json({
+    success: true,
+  });
+}));
+
+router.post('/newOutcome', auth, wrapAsync(async (req, res) => {
+
+  const { phoneNumber, patientID, language } = req.body;
+
+  validatePhoneNumber(phoneNumber);
+
+  if (!patientID || !validateMongoId(patientID) || !checkPatientExist(patientID)) {
+    throw new ValidationError('Invalid patient ID');
   }
 
-  if (req.body.image === null) {
-    const newMessage = new Message({
-      phoneNumber: req.body.phoneNumber,
-      patientID: req.body.patientID,
-      message: req.body.message,
-      sender: req.body.sender,
-      date: req.body.date,
-    });
-    return newMessage.save().then(() => {
-      return res.status(200).json({
-        success: true,
-      });
-    });
-  }
-
-  throw new Error('something went wrong, I should not have gotten here');
-});
-
-router.post('/newOutcome', auth, async (req, res) => {
-  // validate phone number
-  if (
-    !req.body.phoneNumber ||
-    req.body.phoneNumber.match(/\d/g) === null ||
-    req.body.phoneNumber.match(/\d/g).length !== 10
-  ) {
-    return res.status(400).json({
-      msg: 'Unable to add outcome: invalid phone number',
-    });
-  }
-
-  if (req.body.patientID === '') {
-    return res.status(400).json({
-      msg: 'Unable to add outcome: must include patient ID',
-    });
-  }
-
-  if (req.body.language === '') {
-    return res.status(400).json({
-      msg: 'Unable to add outcome: must include language',
-    });
-  }
+  validateLanguage(language);
 
   const newOutcome = new Outcome({
     patientID: req.body.patientID,
@@ -142,40 +118,30 @@ router.post('/newOutcome', auth, async (req, res) => {
     value: req.body.value,
     alertType: req.body.alertType,
   });
-  Patient.findOneAndUpdate(
+
+  await Patient.findOneAndUpdate(
     { _id: req.body.patientID },
     { $inc: { responseCount: 1 } },
   );
-  return newOutcome.save().then(() => {
-    res.status(200).json({
-      success: true,
-    });
+
+  await newOutcome.save();
+
+  res.status(200).json({
+    success: true,
   });
-});
+}));
 
-router.post('/scheduledMessage', auth, async (req, res) => {
-  // validate phone number
-  if (
-    !req.body.phoneNumber ||
-    !req.body.phoneNumber.match(/\d/g) ||
-    req.body.phoneNumber.match(/\d/g).length !== 10
-  ) {
-    return res.status(400).json({
-      msg: 'Unable to add outcome: invalid phone number',
-    });
+router.post('/scheduledMessage', auth, wrapAsync(async (req, res) => {
+
+  const { phoneNumber, patientID, language } = req.body;
+
+  validatePhoneNumber(phoneNumber);
+
+  if (!patientID || !validateMongoId(patientID) || !checkPatientExist(patientID)) {
+    throw new ValidationError('Invalid patient ID');
   }
 
-  if (req.body.patientID === '') {
-    return res.status(400).json({
-      msg: 'Unable to add outcome: must include patient ID',
-    });
-  }
-
-  if (req.body.language === '') {
-    return res.status(400).json({
-      msg: 'Unable to add outcome: must include language',
-    });
-  }
+  validateLanguage(language);
 
   const newMessage = new Message({
     patientID: req.body.patientID,
@@ -185,23 +151,24 @@ router.post('/scheduledMessage', auth, async (req, res) => {
     value: req.body.value,
     alertType: req.body.alertType,
   });
-  return newMessage.save().then(() => {
-    Patient.findByIdAndUpdate(new ObjectId(req.body.patientId), {
-      $inc: { messagesSent: 1 },
-    });
-    res.status(200).json({
-      success: true,
-    });
-  });
-});
 
-router.get('/allOutcomes', auth, async (req, res) => {
-  return Outcome.find()
-    .then((outcomesList) => {
-      Patient.find().then((patientList) => {
-        res.status(200).send({ outcomes: outcomesList, patients: patientList });
-      });
-    })
-    .catch((err) => errorHandler(res, err.msg));
-});
+  await newMessage.save();
+
+  await Patient.findByIdAndUpdate(new ObjectId(req.body.patientId), {
+    $inc: { messagesSent: 1 },
+  });
+
+  res.status(200).json({
+    success: true,
+  });
+}));
+
+router.get('/allOutcomes', auth, wrapAsync(async (req, res) => {
+
+  const outcomeList = await Outcome.find();
+  const patientList = await Patient.find();
+
+  res.status(200).send({ outcomes: outcomeList, patients: patientList }); 
+}));
+
 export default router;
