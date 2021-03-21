@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/indent */
-import express, {Request, Response} from 'express';
+import express from 'express';
 import { Outcome } from '../models/outcome.model';
 import { Patient, PatientForPhoneNumber, checkPatientExist } from '../models/patient.model';
 import auth from '../middleware/auth';
@@ -7,46 +7,61 @@ import { Message } from '../models/message.model';
 import { ValidationError, ResourceNotFoundError } from '../exceptions';
 import { validatePhoneNumber, validateLanguage, validateMessageTime, validateMongoId } from '../validators';
 import wrapAsync from '../utils/asyncWrapper';
+import { Coach } from '../models/coach.model';
 
 const { ObjectId } = require('mongoose').Types;
 
 const router = express.Router();
 
 router.post('/add', auth, wrapAsync(async (req, res) => {
-  
-  validatePhoneNumber(req.body.phoneNumber)
 
-  if (await PatientForPhoneNumber(req.body.phoneNumber)) {
+  const { firstName, lastName, phoneNumber,language, coachId, msgTime, isEnabled } = req.body;
+  
+  validatePhoneNumber(phoneNumber)
+
+  if (await PatientForPhoneNumber(phoneNumber)) {
     throw new ValidationError('Patient already exists for given phone number');
   }
 
-  if (req.body.firstName === '') {
+  if (!firstName) {
     throw new ValidationError('Invalid first name');
   }
 
-  if (req.body.lastName === '') {
+  if (!firstName) {
     throw new ValidationError('Invalid last name');
   }
 
-  validateLanguage(req.body.language);
+  validateLanguage(language);
 
-  if (!req.body.coachId || req.body.coachId === '') {
+  if (!validateMongoId(coachId) ) {
     throw new ValidationError('Invalid coachId');
   }
 
-  const {hours, mins} = validateMessageTime(req.body.msgTime);
+  const coach = await Coach.findById(coachId);
+
+  if (!coach) {
+    throw new ValidationError('Invalid coachId');
+  }
+
+  const coachName = coach.firstName + ' ' + coach.lastName;
+
+  if (isEnabled === undefined || typeof isEnabled !== 'boolean') {
+    throw new ValidationError('Invalid isEnabled field');
+  }
+
+  const {hours, mins} = validateMessageTime(msgTime);
 
   const newPatient = new Patient({
-    firstName: req.body.firstName,
-    lastName: req.body.lastName,
-    language: req.body.language,
-    phoneNumber: req.body.phoneNumber,
+    firstName: firstName,
+    lastName: lastName,
+    language: language,
+    phoneNumber: phoneNumber,
     reports: [],
     responseCount: 0,
     messagesSent: 0,
-    coachID: req.body.coachId,
-    coachName: req.body.coachName,
-    enabled: req.body.isEnabled,
+    coachID: coachId,
+    coachName: coachName,
+    enabled: isEnabled,
     prefTime: hours * 60 + mins,
   });
 
@@ -57,32 +72,18 @@ router.post('/add', auth, wrapAsync(async (req, res) => {
   })
 }));
 
-router.put('/increaseResponseCount/:id', auth, wrapAsync(async (req, res) => {
 
-  validatePhoneNumber(req.body.phoneNumber);
+router.put('/increaseResponseCount/:patientID', auth, wrapAsync(async (req, res) => {
 
-  if (req.body.firstName === '') {
-    throw new ValidationError('Invalid first name');
-  }
+  const id = req.params.patientID;
+  const responseCount = req.body.responseCount;
 
-  if (req.body.lastName === '') {
-    throw new ValidationError('Invalid last name');
-  }
-
-  validateLanguage(req.body.language);
-
-  if(!checkPatientExist(req.params.id)) {
+  if(validateMongoId(id) || !checkPatientExist(id)) {
     throw new ValidationError('Invalid patient id');
   }
 
   const patient = new Patient({
-    firstName: req.body.firstName,
-    lastName: req.body.lastName,
-    language: req.body.language,
-    phoneNumber: req.body.phoneNumber,
-    reports: [],
-    responseCount: req.body.responseCount,
-    messagesSent: req.body.messagesSent,
+    responseCount: responseCount
   });
 
   await Patient.updateOne({ _id: req.params.id }, patient);
@@ -97,7 +98,7 @@ router.get('/getPatientOutcomes/:patientID', auth, wrapAsync(async (req, res) =>
 
   const id = req.params.patientID;
 
-  if(!checkPatientExist(id)) {
+  if(!validateMongoId(id) || !checkPatientExist(id)) {
     throw new ValidationError('Invalid patient id');
   }
 
@@ -126,7 +127,7 @@ router.get('/getPatient/:patientID', auth, wrapAsync(async (req, res) => {
 router.get('/getPatientMessages/:patientID', auth, wrapAsync(async (req, res) => {
   const id = req.params.patientID;
 
-  if(!checkPatientExist(id)) {
+  if(!validateMongoId(id) || !checkPatientExist(id)) {
     throw new ValidationError('Invalid patient id');
   }
 
@@ -138,7 +139,7 @@ router.get('/getPatientMessages/:patientID', auth, wrapAsync(async (req, res) =>
 router.post('/status', auth, wrapAsync(async (req, res) => {
   const { id, status } = req.body;
 
-  if(!checkPatientExist(id)) {
+  if(!validateMongoId(id) || !checkPatientExist(id)) {
     throw new ValidationError('Invalid patient id');
   }
 
