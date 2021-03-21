@@ -78,15 +78,11 @@ router.put('/increaseResponseCount/:patientID', auth, wrapAsync(async (req, res)
   const id = req.params.patientID;
   const responseCount = req.body.responseCount;
 
-  if(validateMongoId(id) || !checkPatientExist(id)) {
+  if(!validateMongoId(id) || !checkPatientExist(id)) {
     throw new ValidationError('Invalid patient id');
   }
 
-  const patient = new Patient({
-    responseCount: responseCount
-  });
-
-  await Patient.updateOne({ _id: req.params.id }, patient);
+  await Patient.updateOne({ _id: id }, {responseCount});
 
   res.status(200).json({
     msg: 'Patient response count updated successfully!',
@@ -145,7 +141,10 @@ router.post('/status', auth, wrapAsync(async (req, res) => {
 
   await Patient.findByIdAndUpdate(new ObjectId(id), { enabled: status });
 
-  res.status(200).json('Patiet Status Changed!');
+  res.status(200).json({
+    succes: "true",
+    message: "Patient status updated."
+  });
 }));
 
 export default router;
