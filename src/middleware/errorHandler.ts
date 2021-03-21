@@ -1,7 +1,9 @@
-import {Request, Response} from 'express';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
+import {NextFunction, Request, Response} from 'express';
 import {ResourceNotFoundError, ValidationError} from '../exceptions';
 
-export default function errorHandler(error: Error, req: Request, res: Response) {
+export default function errorHandler(error: Error, req: Request, res: Response, next: NextFunction) {
   if (error instanceof ResourceNotFoundError) {
     res.status(404).send({
       message: error.message
