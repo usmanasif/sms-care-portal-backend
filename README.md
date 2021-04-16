@@ -22,7 +22,10 @@ We recommend using VSCode as it has very good Typescript support.
 1. Make sure you have all tool dependencies installed and running
 1. Install project dependencies using `yarn install`
 1. Setup your local ENV variables using your prefered shell environment management tool (we like [direnv](https://github.com/direnv/direnv). `src/utils/config.ts` is a great starting point for what env vars you need.
-  * You don't need real values for many env variables (like twilio for instance) as you should be testing individual features in an isolated maner.
+    - You don't need real values for many env variables (like twilio for instance) as you should be testing individual features in an isolated maner without actually hitting 3rd party services.
+    -  The only env variables that need real values are `DATABASE_URI` and `JWT_SECRET`.
+    - `DATABASE_URI` should be a mongo style access URI, aka `mongodb://`.
+    - `JWT_SECRET` is just a random string, so any random string of alphanumeric characters is fine.
 1. Run the tests, local server, or typescript compiler using the relevant yarn command.
 
 ## Contributing
