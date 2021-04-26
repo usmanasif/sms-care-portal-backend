@@ -4,6 +4,7 @@ import { IUser } from '../models/user.model';
 import errorHandler from '../routes/error';
 import { CoachMeRequest } from '../types/coach_me_request';
 import { JWT_SECRET } from '../utils/config';
+import { getKey } from '../utils/redis';
 
 const auth = (
   req: CoachMeRequest,
@@ -19,6 +20,15 @@ const auth = (
     if (jwtErr) {
       return errorHandler(res, 'Your access token is invalid.', 'invalidToken');
     }
+
+    try {
+      if (await getKey(token as string)) {
+        return errorHandler(res, 'Your access token is invalid.', 'invalidToken');
+      }
+    } catch (err) {
+      return errorHandler(res, 'Your access token is invalid.', 'invalidToken');
+    }
+
     // append decoded id onto request
     const decodedUser = decoded as IUser;
 

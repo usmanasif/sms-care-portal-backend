@@ -11,6 +11,7 @@ import {
 } from './coach.util';
 import { Patient } from '../models/patient.model';
 import { CoachMeRequest } from '../types/coach_me_request';
+import { setKeyWithExpiry } from '../utils/redis';
 
 const router = express.Router();
 
@@ -130,6 +131,30 @@ router.get('/search', auth, async (req, res) => {
       coaches: result,
     });
   });
+});
+
+router.delete('/logout', auth, async (req, res) => {
+  try {
+    let token = req.headers.authorization || '';
+    const { userId, body: { refreshToken } } = req;
+
+    if (!refreshToken) return res.status(400).json({ success: false });
+
+    token = token.replace('Bearer ', '');
+
+    await Promise.all([
+      setKeyWithExpiry(token, token, 'EX', 300),
+      Coach.findOneAndUpdate({ _id: userId }, { refreshToken: '' }),
+    ]);
+
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      code: 'serverError',
+      message: 'something went wrong',
+    });
+  }
 });
 
 export default router;
