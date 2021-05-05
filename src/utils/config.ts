@@ -17,5 +17,3 @@ export const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = process.env;
 export const TWILIO_FROM_NUMBER = parseTwilioFromNumber(
   process.env.TWILIO_FROM_NUMBER,
 );
-
-export const REDIS_URL = process.env.REDIS_URL || '';

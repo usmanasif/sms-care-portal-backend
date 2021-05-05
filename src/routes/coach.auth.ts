@@ -1,6 +1,5 @@
 import express from 'express';
 import { hash, compare } from 'bcrypt';
-import { ObjectId } from 'mongodb';
 import { Coach, ICoach } from '../models/coach.model';
 import auth from '../middleware/auth';
 import errorHandler from './error';
@@ -11,7 +10,6 @@ import {
 } from './coach.util';
 import { Patient } from '../models/patient.model';
 import { CoachMeRequest } from '../types/coach_me_request';
-import { setKeyWithExpiry } from '../utils/redis';
 
 const router = express.Router();
 
@@ -56,10 +54,13 @@ router.post('/login', async (req, res) => {
   if (!coach) return errorHandler(res, 'Email or password is incorrect.');
 
   if (await compare(password, coach.password)) {
-    const accessToken = generateAccessToken(coach);
-    const refreshToken = generateRefreshToken(coach);
+    const accessToken = generateAccessToken(coach._id);
+    const refreshToken = generateRefreshToken();
 
-    const tokens = await Promise.all([accessToken, refreshToken]);
+    coach.accessToken = accessToken;
+    coach.refreshToken = refreshToken;
+
+    const tokens = await Promise.all([accessToken, refreshToken, coach.save()]);
     return res.status(200).json({
       success: true,
       accessToken: tokens[0],
@@ -79,8 +80,12 @@ router.post('/refreshToken', (req, res) => {
   }
 
   return validateRefreshToken(refreshToken)
-    .then((tokenResponse: ICoach) => generateAccessToken(tokenResponse))
-    .then((accessToken: string) => {
+    .then((coach: ICoach) => {
+      // eslint-disable-next-line no-param-reassign
+      coach.accessToken = generateAccessToken(coach._id);
+      return coach.save();
+    })
+    .then(({ accessToken }: ICoach) => {
       res.status(200).json({
         success: true,
         accessToken,
@@ -97,15 +102,14 @@ router.post('/refreshToken', (req, res) => {
 // get me
 // protected route
 router.get('/me', auth, (req: CoachMeRequest, res) => {
-  const { userId } = req;
-  return Coach.findById(new ObjectId(userId))
-    .select('firstName lastName email _id')
-    .then((coach) => {
-      if (!coach) return errorHandler(res, 'User does not exist.');
+  const { _id: id, firstName, lastName, email } = req.coach as ICoach;
 
-      return res.status(200).json({ success: true, data: coach });
-    })
-    .catch((err) => errorHandler(res, err.message));
+  return res.status(200).json({ success: true, data: {
+    _id: id,
+    firstName,
+    lastName,
+    email
+  } });
 });
 
 router.get('/getPatients', auth, (req, res) => {
@@ -133,19 +137,14 @@ router.get('/search', auth, async (req, res) => {
   });
 });
 
-router.delete('/logout', auth, async (req, res) => {
+router.delete('/logout', auth, async (req: CoachMeRequest, res) => {
   try {
-    let token = req.headers.authorization || '';
-    const { userId, body: { refreshToken } } = req;
+    const coach = req.coach as ICoach;
 
-    if (!refreshToken) return res.status(400).json({ success: false });
+    coach.refreshToken = '';
+    coach.accessToken = '';
 
-    token = token.replace('Bearer ', '');
-
-    await Promise.all([
-      setKeyWithExpiry(token, token, 'EX', 300),
-      Coach.findOneAndUpdate({ _id: userId }, { refreshToken: '' }),
-    ]);
+    await coach.save();
 
     return res.status(200).json({ success: true });
   } catch (err) {

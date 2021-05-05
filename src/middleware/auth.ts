@@ -1,10 +1,10 @@
 import * as express from 'express';
 import { verify } from 'jsonwebtoken';
+import { Coach, ICoach } from '../models/coach.model';
 import { IUser } from '../models/user.model';
 import errorHandler from '../routes/error';
 import { CoachMeRequest } from '../types/coach_me_request';
 import { JWT_SECRET } from '../utils/config';
-import { getKey } from '../utils/redis';
 
 const auth = (
   req: CoachMeRequest,
@@ -16,16 +16,8 @@ const auth = (
     return errorHandler(res, 'Your access token is invalid.', 'invalidToken');
   token = token.replace('Bearer ', '');
 
-  return verify(token, JWT_SECRET, async (jwtErr, decoded) => {
+  return verify(token, JWT_SECRET, (jwtErr, decoded) => {
     if (jwtErr) {
-      return errorHandler(res, 'Your access token is invalid.', 'invalidToken');
-    }
-
-    try {
-      if (await getKey(token as string)) {
-        return errorHandler(res, 'Your access token is invalid.', 'invalidToken');
-      }
-    } catch (err) {
       return errorHandler(res, 'Your access token is invalid.', 'invalidToken');
     }
 
@@ -35,9 +27,13 @@ const auth = (
     if (!decodedUser._id)
       return errorHandler(res, 'Your access token is invalid.', 'invalidToken');
 
-    req.userId = decodedUser._id;
+    return Coach.findOne({ _id: decodedUser._id, accessToken: token }).then((coach: ICoach | null) => {
+      if (!coach) return errorHandler(res, 'Your access token is invalid.', 'invalidToken');
 
-    return next();
+      req.coach = coach;
+
+      return next();
+    }).catch(() => errorHandler(res, 'Your access token is invalid.', 'invalidToken'));
   });
 };
 

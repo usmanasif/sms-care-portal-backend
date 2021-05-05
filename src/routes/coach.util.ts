@@ -1,6 +1,5 @@
 import { sign, verify } from 'jsonwebtoken';
-import * as _ from 'lodash';
-import { Coach, ICoach } from '../models/coach.model';
+import { Coach } from '../models/coach.model';
 import { JWT_SECRET } from '../utils/config';
 
 class AuthError extends Error {
@@ -12,22 +11,14 @@ class AuthError extends Error {
   }
 }
 
-const generateAccessToken = (coach: ICoach): string =>
-  sign(_.omit(coach.toObject(), 'password'), JWT_SECRET, {
+const generateAccessToken = (_id: string): string =>
+  sign({ _id }, JWT_SECRET, {
     expiresIn: '5 m', // for testing purposes
   });
 
-const generateRefreshToken = (coach: ICoach): any => {
-  const refreshToken = sign({ type: 'refresh' }, JWT_SECRET, {
-    expiresIn: '9999 years',
-  });
-
-  return Coach.findOneAndUpdate({ email: coach.email }, { refreshToken })
-    .then(() => refreshToken)
-    .catch((err) => {
-      throw err;
-    });
-};
+const generateRefreshToken = (): string => sign({ type: 'refresh' }, JWT_SECRET, {
+  expiresIn: '9999 years',
+});
 
 const validateRefreshToken = (refreshToken: string): Promise<any> =>
   new Promise((res, rej) => {

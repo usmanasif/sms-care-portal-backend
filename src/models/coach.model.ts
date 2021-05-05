@@ -9,6 +9,7 @@ interface ICoach extends mongoose.Document {
   email: string;
   password: string;
   refreshToken: string;
+  accessToken: string;
 }
 
 const CoachSchema = new Schema({
@@ -17,6 +18,7 @@ const CoachSchema = new Schema({
   email: { type: String, required: true },
   password: { type: String, required: true },
   refreshToken: { type: String, required: false },
+  accessToken: { type: String, required: false },
 });
 
 const Coach = mongoose.model<ICoach>('Coach', CoachSchema);
